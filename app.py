@@ -2,6 +2,10 @@ import streamlit as st
 from openai import OpenAI
 import os
 
+st.markdown(
+    '<meta name="google-site-verification" content="tUzfqfBAPloPFZwSRE_A8Ej3AmUziDvQ-msgf0VZNmU" />',
+    unsafe_allow_html=True
+)
 # 🔐 Get API key from Streamlit secrets
 API_KEY = st.secrets.get("NVIDIA_API_KEY")
 
