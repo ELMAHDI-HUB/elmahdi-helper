@@ -1,5 +1,7 @@
+import base64
 import io
 import re
+
 import requests
 import streamlit as st
 from openai import OpenAI
@@ -10,6 +12,7 @@ from docx import Document
 # CONFIG
 # -----------------------------
 CHAT_MODEL = "openai/gpt-oss-120b"
+IMAGE_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-medium"
 
 st.set_page_config(page_title="ELMAHDI HELPER", page_icon="🤖", layout="wide")
 st.title("ELMAHDI HELPER 🤖")
@@ -17,6 +20,9 @@ st.caption("Chat • Document Q&A • Image generation")
 
 # -----------------------------
 # SECRETS
+# Keep these names exactly as you already have them in Streamlit:
+# NVIDIA_API_KEY   -> your NVIDIA chat key
+# STABILITY_API_KEY -> your second NVIDIA key for the NVIDIA-hosted SD3 image endpoint
 # -----------------------------
 NVIDIA_API_KEY = st.secrets["NVIDIA_API_KEY"] if "NVIDIA_API_KEY" in st.secrets else None
 STABILITY_API_KEY = st.secrets["STABILITY_API_KEY"] if "STABILITY_API_KEY" in st.secrets else None
@@ -25,7 +31,7 @@ chat_client = None
 if NVIDIA_API_KEY:
     chat_client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
-        api_key=NVIDIA_API_KEY
+        api_key=NVIDIA_API_KEY,
     )
 
 # -----------------------------
@@ -36,9 +42,8 @@ You are ELMAHDI HELPER, a helpful and friendly AI assistant created by Elmahdi O
 
 Rules:
 - If asked who created you, answer: "I was created by Elmahdi Oukassou, a developer."
-- Do not mention OpenAI, NVIDIA, or any other company as your creator.
-- Never show internal reasoning, chain-of-thought, or <think> tags.
-- Give clean, final answers.
+- Never show chain-of-thought, internal reasoning, or <think> tags.
+- Give clean, final answers only.
 - Be concise and helpful.
 """.strip()
 
@@ -50,9 +55,10 @@ def clean_reply(text: str) -> str:
     return text.strip()
 
 
-def ask_chat(messages, max_tokens=1000):
+def ask_chat(messages, max_tokens=1000) -> str:
     if chat_client is None:
-        raise RuntimeError("Missing NVIDIA_API_KEY")
+        raise RuntimeError("Missing NVIDIA_API_KEY in Streamlit Secrets.")
+
     response = chat_client.chat.completions.create(
         model=CHAT_MODEL,
         messages=messages,
@@ -61,7 +67,7 @@ def ask_chat(messages, max_tokens=1000):
         max_tokens=max_tokens,
         stream=False,
     )
-    return clean_reply(response.choices[0].message.content)
+    return clean_reply(response.choices[0].message.content or "")
 
 
 def read_document(uploaded_file) -> str:
@@ -89,25 +95,29 @@ def read_document(uploaded_file) -> str:
 
 def generate_image(prompt: str, negative_prompt: str = "", aspect_ratio: str = "1:1") -> bytes:
     if not STABILITY_API_KEY:
-        raise RuntimeError("Missing STABILITY_API_KEY")
+        raise RuntimeError("Missing STABILITY_API_KEY in Streamlit Secrets.")
 
-    url = "https://api.stability.ai/v2beta/stable-image/generate/core"
     headers = {
         "Authorization": f"Bearer {STABILITY_API_KEY}",
-        "Accept": "image/*",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
     }
 
-    # multipart/form-data
-    files = {
-        "prompt": (None, prompt),
-        "output_format": (None, "png"),
-        "aspect_ratio": (None, aspect_ratio),
+    payload = {
+        "prompt": prompt,
+        "mode": "text-to-image",
+        "model": "sd3",
+        "aspect_ratio": aspect_ratio,
+        "output_format": "jpeg",
+        "cfg_scale": 5,
+        "steps": 30,
+        "seed": 0,
     }
 
     if negative_prompt.strip():
-        files["negative_prompt"] = (None, negative_prompt.strip())
+        payload["negative_prompt"] = negative_prompt.strip()
 
-    response = requests.post(url, headers=headers, files=files, timeout=180)
+    response = requests.post(IMAGE_ENDPOINT, headers=headers, json=payload, timeout=180)
 
     if response.status_code != 200:
         try:
@@ -116,7 +126,12 @@ def generate_image(prompt: str, negative_prompt: str = "", aspect_ratio: str = "
             detail = response.text
         raise RuntimeError(f"{response.status_code}: {detail}")
 
-    return response.content
+    data = response.json()
+
+    if "image" not in data:
+        raise RuntimeError(f"Unexpected response format: {data}")
+
+    return base64.b64decode(data["image"])
 
 
 # -----------------------------
@@ -126,16 +141,16 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 # -----------------------------
-# UI
+# UI TABS
 # -----------------------------
-tab_chat, tab_doc, tab_image = st.tabs(
+chat_tab, doc_tab, image_tab = st.tabs(
     ["💬 Chat", "📄 Document Q&A", "🎨 Generate Image"]
 )
 
 # -----------------------------
 # CHAT TAB
 # -----------------------------
-with tab_chat:
+with chat_tab:
     if not NVIDIA_API_KEY:
         st.warning("Add NVIDIA_API_KEY in Streamlit Secrets to use chat.")
     else:
@@ -153,7 +168,7 @@ with tab_chat:
                 st.markdown(user_input)
 
             messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-            messages.extend(st.session_state.chat_history[-12:])  # keep recent history
+            messages.extend(st.session_state.chat_history[-12:])
 
             with st.chat_message("assistant", avatar="🤖"):
                 with st.spinner("Thinking..."):
@@ -168,7 +183,7 @@ with tab_chat:
 # -----------------------------
 # DOCUMENT TAB
 # -----------------------------
-with tab_doc:
+with doc_tab:
     if not NVIDIA_API_KEY:
         st.warning("Add NVIDIA_API_KEY in Streamlit Secrets to use document Q&A.")
     else:
@@ -201,7 +216,7 @@ with tab_doc:
                     if not doc_question.strip():
                         st.warning("Type a question first.")
                     else:
-                        doc_messages = [
+                        messages = [
                             {
                                 "role": "system",
                                 "content": SYSTEM_PROMPT + "\nUse the uploaded document when answering.",
@@ -217,7 +232,7 @@ with tab_doc:
 
                         with st.spinner("Reading document..."):
                             try:
-                                answer = ask_chat(doc_messages, max_tokens=1200)
+                                answer = ask_chat(messages, max_tokens=1200)
                                 st.markdown("### Answer")
                                 st.write(answer)
                             except Exception as e:
@@ -228,9 +243,9 @@ with tab_doc:
 # -----------------------------
 # IMAGE GENERATION TAB
 # -----------------------------
-with tab_image:
+with image_tab:
     if not STABILITY_API_KEY:
-        st.warning("Add STABILITY_API_KEY in Streamlit Secrets to generate images.")
+        st.warning("Add STABILITY_API_KEY in Streamlit Secrets to use image generation.")
     else:
         prompt = st.text_area(
             "Describe the image you want",
@@ -247,7 +262,7 @@ with tab_image:
 
         aspect_ratio = st.selectbox(
             "Aspect ratio",
-            ["1:1", "16:9", "9:16", "4:3", "3:2"],
+            ["1:1", "16:9", "9:16"],
             index=0,
             key="aspect_ratio",
         )
@@ -263,8 +278,8 @@ with tab_image:
                         st.download_button(
                             "Download image",
                             data=image_bytes,
-                            file_name="elmahdi-helper-image.png",
-                            mime="image/png",
+                            file_name="elmahdi-helper-image.jpg",
+                            mime="image/jpeg",
                         )
                     except Exception as e:
                         st.error(f"Image generation failed: {e}")
