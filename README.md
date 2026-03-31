@@ -3,8 +3,7 @@
 ELMAHDI HELPER is a powerful AI chatbot created by Elmahdi Oukassou.
 
 👉 Try it here:
-https://your-app-link.streamlit.app
-
+https://elmahdi-apper-ygi66g88wrf8i9funciuk4.streamlit.app/
 Features:
 - AI chat assistant
 - Coding help
