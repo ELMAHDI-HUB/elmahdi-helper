@@ -21,18 +21,65 @@ st.set_page_config(
     layout="wide",
 )
 
+
+def brand_logo_html(size: int = 56, show_text: bool = True, compact: bool = False) -> str:
+    text_html = (
+        """
+        <div class="brand-meta">
+            <div class="brand-kicker">Elmahdi AI</div>
+            <div class="brand-name">ELMAHDI HELPER</div>
+        </div>
+        """
+        if show_text
+        else ""
+    )
+
+    compact_class = "compact" if compact else ""
+
+    return f"""
+    <div class="brand-lockup {compact_class}">
+        <div class="brand-logo" style="width:{size}px;height:{size}px;">
+            <svg viewBox="0 0 72 72" width="{size}" height="{size}" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="54" cy="18" r="7" fill="#7dd3fc" opacity="0.95"/>
+                <path d="M24 20H48" stroke="white" stroke-width="7" stroke-linecap="round"/>
+                <path d="M24 36H43" stroke="white" stroke-width="7" stroke-linecap="round"/>
+                <path d="M24 52H48" stroke="white" stroke-width="7" stroke-linecap="round"/>
+                <path d="M24 20V52" stroke="white" stroke-width="7" stroke-linecap="round"/>
+            </svg>
+        </div>
+        {text_html}
+    </div>
+    """
+
+
 # =========================================
 # STYLING
 # =========================================
 st.markdown(
     """
     <style>
+        :root {
+            --bg-1: #050914;
+            --bg-2: #0a1220;
+            --panel: rgba(255,255,255,0.05);
+            --panel-strong: rgba(11, 18, 31, 0.88);
+            --border: rgba(255,255,255,0.09);
+            --text: #eef5ff;
+            --muted: #bfd0ea;
+            --muted-2: #8ea6cb;
+            --blue: #60a5fa;
+            --cyan: #22d3ee;
+            --violet: #8b5cf6;
+            --shadow: 0 20px 60px rgba(0,0,0,0.28);
+        }
+
         .stApp {
             background:
-                radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 30%),
-                radial-gradient(circle at top right, rgba(168, 85, 247, 0.16), transparent 28%),
-                linear-gradient(180deg, #060b16 0%, #0c1320 100%);
-            color: #eaf2ff;
+                radial-gradient(circle at 12% 10%, rgba(96, 165, 250, 0.18), transparent 24%),
+                radial-gradient(circle at 88% 6%, rgba(139, 92, 246, 0.16), transparent 22%),
+                radial-gradient(circle at 50% 100%, rgba(34, 211, 238, 0.10), transparent 30%),
+                linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+            color: var(--text);
         }
 
         [data-testid="stHeader"] {
@@ -40,111 +87,321 @@ st.markdown(
         }
 
         [data-testid="stSidebar"] {
-            background: rgba(10, 15, 25, 0.92);
-            border-right: 1px solid rgba(255,255,255,0.07);
+            background: rgba(7, 12, 22, 0.9);
+            border-right: 1px solid var(--border);
         }
 
         .block-container {
-            max-width: 1200px;
+            max-width: 1240px;
             padding-top: 1.2rem;
             padding-bottom: 2rem;
+        }
+
+        .brand-side-card,
+        .hero,
+        .feature-strip,
+        [data-testid="stChatMessage"],
+        .card {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .brand-side-card {
+            position: relative;
+            overflow: hidden;
+            padding: 1rem 1rem 0.9rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+            box-shadow: var(--shadow);
+            margin-bottom: 1rem;
+        }
+
+        .brand-side-card::after,
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -15% -35% auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(125, 211, 252, 0.18), transparent 60%);
+            pointer-events: none;
+        }
+
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+
+        .brand-lockup.compact {
+            gap: 0.75rem;
+        }
+
+        .brand-logo {
+            position: relative;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 22px;
+            background: linear-gradient(135deg, #4338ca 0%, #0ea5e9 55%, #22d3ee 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.18),
+                0 18px 35px rgba(37, 99, 235, 0.28);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .brand-logo::before {
+            content: "";
+            position: absolute;
+            inset: 1px;
+            border-radius: 21px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0));
+            pointer-events: none;
+        }
+
+        .brand-kicker {
+            font-size: 0.78rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #b8d6ff;
+            margin-bottom: 0.12rem;
+        }
+
+        .brand-name {
+            color: #ffffff;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            font-size: 1.02rem;
+        }
+
+        .brand-side-card p {
+            color: var(--muted);
+            font-size: 0.93rem;
+            margin: 0.8rem 0 0 0;
+            line-height: 1.45;
         }
 
         .hero {
             position: relative;
             overflow: hidden;
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.12));
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 24px;
-            padding: 1.4rem 1.4rem 1.1rem 1.4rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.28);
-            margin-bottom: 1rem;
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.9fr);
+            gap: 1rem;
+            align-items: stretch;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.20), rgba(14, 165, 233, 0.10));
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 1.35rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 0.95rem;
         }
 
-        .hero::after {
-            content: "";
-            position: absolute;
-            inset: -30%;
-            background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 35%);
-            transform: rotate(8deg);
-            pointer-events: none;
+        .hero-copy {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-logo-row {
+            margin-bottom: 0.6rem;
         }
 
         .eyebrow {
-            display: inline-block;
-            font-size: 0.8rem;
-            letter-spacing: 0.08em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.78rem;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: #b5cdfc;
-            margin-bottom: 0.45rem;
+            color: #c5dbff;
+            margin-bottom: 0.6rem;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--blue), var(--cyan));
+            box-shadow: 0 0 14px rgba(34, 211, 238, 0.65);
         }
 
         .hero h1 {
             margin: 0;
-            font-size: 2.3rem;
-            line-height: 1.05;
+            font-size: clamp(2rem, 3vw, 3rem);
+            line-height: 1.02;
             color: #f8fbff;
         }
 
         .hero p {
-            margin: 0.65rem 0 0 0;
-            color: #c8d7f0;
+            margin: 0.72rem 0 0 0;
+            color: var(--muted);
             font-size: 1.02rem;
+            line-height: 1.6;
+            max-width: 700px;
         }
 
         .pill-row {
-            margin-top: 0.95rem;
+            margin-top: 1rem;
             display: flex;
             flex-wrap: wrap;
             gap: 0.55rem;
         }
 
         .pill {
-            display: inline-block;
-            padding: 0.42rem 0.78rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            padding: 0.46rem 0.82rem;
             border-radius: 999px;
             background: rgba(255,255,255,0.065);
             border: 1px solid rgba(255,255,255,0.08);
             color: #eef5ff;
+            font-size: 0.91rem;
+        }
+
+        .pill::before {
+            content: "✦";
+            color: #8be9ff;
+            font-size: 0.8rem;
+        }
+
+        .hero-side {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .hero-mini-card,
+        .feature-card,
+        .status-item {
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 0.95rem 1rem;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.16);
+        }
+
+        .mini-label {
+            color: #b9d3ff;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.35rem;
+        }
+
+        .mini-value {
+            color: white;
+            font-size: 1.06rem;
+            font-weight: 700;
+            margin-bottom: 0.28rem;
+        }
+
+        .mini-meta {
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        .feature-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.8rem;
+            margin: 0 0 1rem 0;
+        }
+
+        .feature-card h3 {
+            margin: 0 0 0.28rem 0;
+            color: #f7fbff;
+            font-size: 1rem;
+        }
+
+        .feature-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        .feature-icon {
+            display: inline-grid;
+            place-items: center;
+            width: 2.2rem;
+            height: 2.2rem;
+            border-radius: 14px;
+            margin-bottom: 0.7rem;
+            font-size: 1.05rem;
+            background: linear-gradient(135deg, rgba(79,70,229,0.36), rgba(6,182,212,0.28));
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin: 0.1rem 0 0.85rem 0;
+        }
+
+        .section-title h2 {
+            margin: 0;
+            color: #f7fbff;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .section-title p {
+            margin: 0.15rem 0 0 0;
+            color: var(--muted-2);
             font-size: 0.92rem;
         }
 
-        .card {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.07);
-            border-radius: 22px;
-            padding: 1rem;
-            box-shadow: 0 14px 36px rgba(0,0,0,0.18);
-        }
-
         div[data-baseweb="tab-list"] {
-            gap: 0.45rem;
-            margin-bottom: 0.75rem;
+            gap: 0.55rem;
+            margin-bottom: 0.9rem;
         }
 
-        div[data-baseweb="tab"] {
-            border-radius: 12px;
-            padding: 0.48rem 0.9rem;
-            background: rgba(255,255,255,0.03);
+        button[data-baseweb="tab"] {
+            border-radius: 14px !important;
+            padding: 0.55rem 1rem !important;
+            background: rgba(255,255,255,0.03) !important;
+            border: 1px solid rgba(255,255,255,0.06) !important;
+            color: #d7e6ff !important;
+            transition: 0.2s ease;
+        }
+
+        button[data-baseweb="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, rgba(79,70,229,0.34), rgba(6,182,212,0.28)) !important;
+            border-color: rgba(125, 211, 252, 0.24) !important;
+            color: white !important;
+            box-shadow: 0 10px 24px rgba(79,70,229,0.18);
         }
 
         [data-testid="stChatMessage"] {
-            background: rgba(255,255,255,0.035);
-            border: 1px solid rgba(255,255,255,0.06);
+            background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.028));
+            border: 1px solid rgba(255,255,255,0.065);
+            border-radius: 20px;
+            padding: 0.55rem 0.85rem;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+        }
+
+        [data-testid="stChatInput"] {
+            background: rgba(8, 14, 24, 0.75);
+            border: 1px solid rgba(255,255,255,0.07);
             border-radius: 18px;
-            padding: 0.45rem 0.75rem;
+            padding: 0.15rem;
         }
 
         .loader-wrap {
             display: inline-flex;
             align-items: center;
             gap: 0.75rem;
-            padding: 0.78rem 0.95rem;
+            padding: 0.8rem 1rem;
             border-radius: 16px;
             background: rgba(255,255,255,0.045);
             border: 1px solid rgba(255,255,255,0.08);
             box-shadow: 0 10px 28px rgba(0,0,0,0.16);
-            margin: 0.2rem 0 0.4rem 0;
+            margin: 0.2rem 0 0.45rem 0;
         }
 
         .loader-text {
@@ -169,12 +426,12 @@ st.markdown(
         .dots span:nth-child(3) { animation-delay: 0.3s; }
 
         @keyframes blink {
-            0%, 80%, 100% { transform: scale(0.7); opacity: 0.35; }
+            0%, 80%, 100% { transform: scale(0.72); opacity: 0.35; }
             40% { transform: scale(1); opacity: 1; }
         }
 
         .preview-shell {
-            min-height: 360px;
+            min-height: 380px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -184,14 +441,16 @@ st.markdown(
 
         .shimmer {
             width: 100%;
-            min-height: 360px;
-            border-radius: 22px;
+            min-height: 380px;
+            border-radius: 24px;
             border: 1px solid rgba(255,255,255,0.08);
             background:
-                linear-gradient(110deg,
+                linear-gradient(
+                    110deg,
                     rgba(255,255,255,0.04) 8%,
                     rgba(255,255,255,0.10) 18%,
-                    rgba(255,255,255,0.04) 33%);
+                    rgba(255,255,255,0.04) 33%
+                );
             background-size: 200% 100%;
             animation: shimmer 1.2s linear infinite;
         }
@@ -200,42 +459,180 @@ st.markdown(
             to { background-position-x: -200%; }
         }
 
-        .stButton button, .stDownloadButton button {
+        .stButton button,
+        .stDownloadButton button {
             border-radius: 16px !important;
             border: 1px solid rgba(255,255,255,0.08) !important;
             background: linear-gradient(135deg, #4f46e5, #06b6d4) !important;
             color: white !important;
             font-weight: 700 !important;
-            padding-top: 0.55rem !important;
-            padding-bottom: 0.55rem !important;
+            padding-top: 0.58rem !important;
+            padding-bottom: 0.58rem !important;
+            box-shadow: 0 14px 28px rgba(79,70,229,0.22);
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .stButton button:hover,
+        .stDownloadButton button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 34px rgba(79,70,229,0.28);
+        }
+
+        .stTextInput input,
+        .stTextArea textarea,
+        .stNumberInput input {
+            background: rgba(8, 14, 24, 0.82) !important;
+            color: #eef5ff !important;
+            border-radius: 14px !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
         }
 
         .stTextInput > div > div,
-        .stTextArea textarea,
+        .stTextArea > div > div,
         .stSelectbox > div > div,
         .stNumberInput > div > div,
         .stFileUploader > div {
             border-radius: 14px !important;
         }
 
+        div[data-baseweb="select"] > div {
+            background: rgba(8, 14, 24, 0.82) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            color: #eef5ff !important;
+        }
+
+        section[data-testid="stFileUploadDropzone"] {
+            background: rgba(8, 14, 24, 0.68) !important;
+            border: 1px dashed rgba(125, 211, 252, 0.28) !important;
+            border-radius: 18px !important;
+        }
+
+        [data-testid="stMarkdownContainer"] code {
+            color: #d8e7ff;
+        }
+
+        .status-stack {
+            display: grid;
+            gap: 0.65rem;
+            margin-top: 0.55rem;
+        }
+
+        .status-item {
+            padding: 0.75rem 0.85rem;
+            border-radius: 16px;
+        }
+
+        .status-top {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            color: #f6fbff;
+            font-size: 0.93rem;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+
+        .status-dot {
+            width: 0.62rem;
+            height: 0.62rem;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .status-dot.ok {
+            background: #22c55e;
+            box-shadow: 0 0 14px rgba(34, 197, 94, 0.45);
+        }
+
+        .status-dot.off {
+            background: #f59e0b;
+            box-shadow: 0 0 14px rgba(245, 158, 11, 0.38);
+        }
+
+        .status-sub {
+            color: var(--muted-2);
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+
+        .subtle-note {
+            color: var(--muted-2);
+            font-size: 0.84rem;
+            margin-top: 0.55rem;
+        }
+
         footer { visibility: hidden; }
         #MainMenu { visibility: hidden; }
+
+        @media (max-width: 980px) {
+            .hero,
+            .feature-strip {
+                grid-template-columns: 1fr;
+            }
+
+            .hero {
+                padding: 1.15rem;
+            }
+        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 st.markdown(
-    """
+    f"""
     <div class="hero">
-        <div class="eyebrow">Elmahdi AI</div>
-        <h1>ELMAHDI HELPER 🤖</h1>
-        <p>Smart chat, document Q&amp;A, and image generation in one clean app.</p>
-        <div class="pill-row">
-            <span class="pill">Creator: Elmahdi Oukassou</span>
-            <span class="pill">Fast replies</span>
-            <span class="pill">Doc upload</span>
-            <span class="pill">Image generator</span>
+        <div class="hero-copy">
+            <div class="eyebrow">Premium AI workspace</div>
+            <div class="hero-logo-row">
+                {brand_logo_html(size=64, show_text=True)}
+            </div>
+            <h1>Smart chat, document Q&amp;A, and image generation in one clean app.</h1>
+            <p>
+                A more polished, modern interface with stronger branding, better contrast,
+                cleaner spacing, and a safer glass-style design that still keeps your original app logic intact.
+            </p>
+            <div class="pill-row">
+                <span class="pill">Creator: Elmahdi Oukassou</span>
+                <span class="pill">Fast replies</span>
+                <span class="pill">Doc upload</span>
+                <span class="pill">Image generator</span>
+            </div>
+        </div>
+        <div class="hero-side">
+            <div class="hero-mini-card">
+                <div class="mini-label">Brand style</div>
+                <div class="mini-value">Modern glass + neon accent</div>
+                <div class="mini-meta">Inline logo mark, higher readability, and safer visual polish without touching your API flow.</div>
+            </div>
+            <div class="hero-mini-card">
+                <div class="mini-label">Built for</div>
+                <div class="mini-value">Chat, docs, and images</div>
+                <div class="mini-meta">Tabs, cards, loaders, inputs, and preview areas now feel more consistent across the whole app.</div>
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div class="feature-strip">
+        <div class="feature-card">
+            <div class="feature-icon">💬</div>
+            <h3>Conversational UI</h3>
+            <p>Cleaner chat bubbles, better tab focus, and a smoother input area that feels more premium.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">📄</div>
+            <h3>Document workspace</h3>
+            <p>Sharper uploader styling and a neater text preview so long files feel easier to inspect.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3>Image studio</h3>
+            <p>A more polished preview panel and branded empty state that matches the rest of the interface.</p>
         </div>
     </div>
     """,
@@ -313,7 +710,7 @@ def typewriter_markdown(placeholder, text: str, delay: float = 0.012):
         placeholder.markdown(text)
         return
 
-    parts = re.split(r"(\\s+)", text)
+    parts = re.split(r"(\s+)", text)
     built = ""
     for part in parts:
         built += part
@@ -352,11 +749,11 @@ def read_document(uploaded_file) -> str:
             page_text = page.extract_text() or ""
             if page_text.strip():
                 parts.append(page_text)
-        return "\\n\\n".join(parts)
+        return "\n\n".join(parts)
 
     if name.endswith(".docx"):
         doc = Document(io.BytesIO(raw))
-        return "\\n".join(paragraph.text for paragraph in doc.paragraphs)
+        return "\n".join(paragraph.text for paragraph in doc.paragraphs)
 
     return ""
 
@@ -381,7 +778,7 @@ def extract_image_bytes(data: dict) -> bytes:
 
             if isinstance(first, dict):
 
-                # 🚨 Handle blocked content
+                # Handle blocked content
                 if first.get("finishReason") == "CONTENT_FILTERED":
                     raise RuntimeError(
                         "This prompt was blocked by the safety filter. Try a more generic prompt (no real people)."
@@ -467,17 +864,52 @@ if "last_image_prompt" not in st.session_state:
 # SIDEBAR
 # =========================================
 with st.sidebar:
+    st.markdown(
+        f"""
+        <div class="brand-side-card">
+            {brand_logo_html(size=50, show_text=True, compact=True)}
+            <p>
+                A branded AI assistant with a cleaner visual system, safer contrast,
+                and a stronger identity without changing your core app behavior.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.markdown("### Control panel")
     image_style = st.selectbox("Image style", list(STYLE_PRESETS.keys()), index=1)
     image_seed = st.number_input("Image seed (0 = random)", min_value=0, value=0, step=1)
 
     if st.button("Clear chat history", use_container_width=True):
         st.session_state.chat_history = []
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### Status")
-    st.caption("Chat key loaded" if CHAT_API_KEY else "Missing NVIDIA_API_KEY")
-    st.caption("Image key loaded" if IMAGE_API_KEY else "Missing STABILITY_API_KEY")
+
+    st.markdown(
+        f"""
+        <div class="status-stack">
+            <div class="status-item">
+                <div class="status-top">
+                    <span class="status-dot {'ok' if CHAT_API_KEY else 'off'}"></span>
+                    Chat service
+                </div>
+                <div class="status-sub">{'Connected and ready' if CHAT_API_KEY else 'Missing NVIDIA_API_KEY'}</div>
+            </div>
+            <div class="status-item">
+                <div class="status-top">
+                    <span class="status-dot {'ok' if IMAGE_API_KEY else 'off'}"></span>
+                    Image service
+                </div>
+                <div class="status-sub">{'Connected and ready' if IMAGE_API_KEY else 'Missing STABILITY_API_KEY'}</div>
+            </div>
+        </div>
+        <div class="subtle-note">Tip: keep prompts specific for better image results and clearer document answers.</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # =========================================
 # TABS
@@ -488,6 +920,18 @@ chat_tab, doc_tab, image_tab = st.tabs(["💬 Chat", "📄 Document Q&A", "🎨 
 # CHAT TAB
 # =========================================
 with chat_tab:
+    st.markdown(
+        """
+        <div class="section-title">
+            <div>
+                <h2>Chat assistant</h2>
+                <p>Ask questions, brainstorm ideas, or get quick help in a cleaner conversation view.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if not CHAT_API_KEY:
         st.info("Add NVIDIA_API_KEY in Streamlit Secrets to use chat.")
     else:
@@ -524,6 +968,18 @@ with chat_tab:
 # DOCUMENT TAB
 # =========================================
 with doc_tab:
+    st.markdown(
+        """
+        <div class="section-title">
+            <div>
+                <h2>Document Q&amp;A</h2>
+                <p>Upload a file, preview extracted text, and ask focused questions about the content.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if not CHAT_API_KEY:
         st.info("Add NVIDIA_API_KEY in Streamlit Secrets to use document Q&A.")
     else:
@@ -550,7 +1006,7 @@ with doc_tab:
 
             if doc_text.strip():
                 with st.expander("Preview extracted text"):
-                    st.text(doc_text[:3500])
+                    st.code(doc_text[:3500], language="text")
 
                 if st.button("Analyze document", use_container_width=True):
                     if not doc_question.strip():
@@ -559,11 +1015,11 @@ with doc_tab:
                         messages = [
                             {
                                 "role": "system",
-                                "content": SYSTEM_PROMPT + "\\nUse the uploaded document when answering.",
+                                "content": SYSTEM_PROMPT + "\nUse the uploaded document when answering.",
                             },
                             {
                                 "role": "user",
-                                "content": f"Document content:\\n\\n{doc_text[:50000]}\\n\\nQuestion:\\n{doc_question}",
+                                "content": f"Document content:\n\n{doc_text[:50000]}\n\nQuestion:\n{doc_question}",
                             },
                         ]
 
@@ -585,6 +1041,18 @@ with doc_tab:
 # IMAGE TAB
 # =========================================
 with image_tab:
+    st.markdown(
+        """
+        <div class="section-title">
+            <div>
+                <h2>Image studio</h2>
+                <p>Describe your idea, pick a style, and generate images in a cleaner branded workspace.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if not IMAGE_API_KEY:
         st.info("Add STABILITY_API_KEY in Streamlit Secrets to use image generation.")
     else:
@@ -644,9 +1112,9 @@ with image_tab:
                     """
                     <div class="card preview-shell">
                         <div>
-                            <h3 style="margin:0 0 0.5rem 0; color:#eef6ff;">Preview</h3>
-                            <p style="margin:0; color:#bfd0ea;">
-                                Your generated image will appear here.
+                            <h3 style="margin:0 0 0.5rem 0; color:#eef6ff;">Image preview</h3>
+                            <p style="margin:0; color:#bfd0ea; line-height:1.6;">
+                                Your generated image will appear here with the new branded preview style.
                             </p>
                         </div>
                     </div>
