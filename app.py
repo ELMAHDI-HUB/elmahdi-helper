@@ -142,11 +142,9 @@ st.markdown(
     """
     <div class="hero">
         <h1>ELMAHDI HELPER 🤖</h1>
-        <p>Smart chat, document Q&amp;A, and NVIDIA image generation in one clean app.</p>
+        <p>Smart chat, document Q&A, and image generation in one clean app.</p>
         <div class="pill-row">
-            <span class="pill">Creator: Elmahdi Oukassou</span>
-            <span class="pill">Chat: GPT-OSS-120B</span>
-            <span class="pill">Images: FLUX.2-klein-4b</span>
+            <span class="pill">Powered by ELMAHDI</span>
         </div>
     </div>
     """,
