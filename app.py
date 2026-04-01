@@ -371,11 +371,23 @@ def build_image_prompt(user_prompt: str, style_label: str, avoid_text: str) -> s
 
 def extract_image_bytes(data: dict) -> bytes:
     if isinstance(data, dict):
+
+        # NVIDIA / Stability format
         if isinstance(data.get("artifacts"), list) and data["artifacts"]:
             first = data["artifacts"][0]
-            if isinstance(first, dict) and first.get("base64"):
-                return base64.b64decode(first["base64"])
 
+            if isinstance(first, dict):
+
+                # 🚨 Handle blocked content
+                if first.get("finishReason") == "CONTENT_FILTERED":
+                    raise RuntimeError(
+                        "This prompt was blocked by the safety filter. Try a more generic prompt (no real people)."
+                    )
+
+                if first.get("base64"):
+                    return base64.b64decode(first["base64"])
+
+        # OpenAI-like format
         if isinstance(data.get("data"), list) and data["data"]:
             first = data["data"][0]
             if isinstance(first, dict) and first.get("b64_json"):
@@ -383,6 +395,7 @@ def extract_image_bytes(data: dict) -> bytes:
 
         if data.get("image"):
             return base64.b64decode(data["image"])
+
         if data.get("b64_json"):
             return base64.b64decode(data["b64_json"])
 
