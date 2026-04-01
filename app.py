@@ -9,9 +9,11 @@ from openai import OpenAI
 from PyPDF2 import PdfReader
 from docx import Document
 
+# =========================================
+# CONFIG
+# =========================================
 CHAT_MODEL = "openai/gpt-oss-120b"
-FLUX_GENERATE_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b"
-FLUX_EDIT_ENDPOINT = "https://ai.api.nvidia.com/v1/images/edits"
+FLUX_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b"
 
 st.set_page_config(
     page_title="ELMAHDI HELPER",
@@ -19,6 +21,9 @@ st.set_page_config(
     layout="wide",
 )
 
+# =========================================
+# STYLING
+# =========================================
 st.markdown(
     """
     <style>
@@ -54,6 +59,15 @@ st.markdown(
             padding: 1.4rem 1.4rem 1.1rem 1.4rem;
             box-shadow: 0 20px 60px rgba(0,0,0,0.28);
             margin-bottom: 1rem;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: -30%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 35%);
+            transform: rotate(8deg);
+            pointer-events: none;
         }
 
         .eyebrow {
@@ -216,18 +230,24 @@ st.markdown(
     <div class="hero">
         <div class="eyebrow">Elmahdi AI</div>
         <h1>ELMAHDI HELPER 🤖</h1>
-        <p>Smart chat, document Q&amp;A, image generation, and image editing in one clean app.</p>
+        <p>Smart chat, document Q&amp;A, and image generation in one clean app.</p>
         <div class="pill-row">
             <span class="pill">Creator: Elmahdi Oukassou</span>
             <span class="pill">Fast replies</span>
             <span class="pill">Doc upload</span>
-            <span class="pill">Image tools</span>
+            <span class="pill">Image generator</span>
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
+# =========================================
+# SECRETS
+# Keep these exact names in Streamlit Secrets:
+# NVIDIA_API_KEY   = your chat key
+# STABILITY_API_KEY = your second NVIDIA key from the FLUX page
+# =========================================
 CHAT_API_KEY = st.secrets["NVIDIA_API_KEY"] if "NVIDIA_API_KEY" in st.secrets else None
 IMAGE_API_KEY = st.secrets["STABILITY_API_KEY"] if "STABILITY_API_KEY" in st.secrets else None
 
@@ -238,6 +258,9 @@ if CHAT_API_KEY:
         api_key=CHAT_API_KEY,
     )
 
+# =========================================
+# PROMPTS / PRESETS
+# =========================================
 SYSTEM_PROMPT = """
 You are ELMAHDI HELPER, a helpful and friendly AI assistant created by Elmahdi Oukassou.
 
@@ -256,10 +279,14 @@ STYLE_PRESETS = {
     "Fantasy": "fantasy art, magical atmosphere, epic composition, highly detailed illustration",
 }
 
+# =========================================
+# HELPERS
+# =========================================
 def clean_reply(text: str) -> str:
     if not text:
         return ""
     return re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+
 
 def show_loader(container, label: str):
     container.markdown(
@@ -272,10 +299,13 @@ def show_loader(container, label: str):
         unsafe_allow_html=True,
     )
 
+
 def typewriter_markdown(placeholder, text: str, delay: float = 0.012):
     if not text:
         placeholder.markdown("")
         return
+
+    # Avoid making huge answers painfully slow
     if len(text) > 1400:
         placeholder.markdown(text)
         return
@@ -289,9 +319,11 @@ def typewriter_markdown(placeholder, text: str, delay: float = 0.012):
             time.sleep(delay)
     placeholder.markdown(built)
 
+
 def ask_chat(messages, max_tokens: int = 1000) -> str:
     if chat_client is None:
         raise RuntimeError("Missing NVIDIA_API_KEY in Streamlit Secrets.")
+
     response = chat_client.chat.completions.create(
         model=CHAT_MODEL,
         messages=messages,
@@ -301,6 +333,7 @@ def ask_chat(messages, max_tokens: int = 1000) -> str:
         stream=False,
     )
     return clean_reply(response.choices[0].message.content or "")
+
 
 def read_document(uploaded_file) -> str:
     raw = uploaded_file.getvalue()
@@ -324,6 +357,7 @@ def read_document(uploaded_file) -> str:
 
     return ""
 
+
 def build_image_prompt(user_prompt: str, style_label: str, avoid_text: str) -> str:
     parts = []
     preset = STYLE_PRESETS.get(style_label, "")
@@ -334,20 +368,26 @@ def build_image_prompt(user_prompt: str, style_label: str, avoid_text: str) -> s
         parts.append(f"avoid {avoid_text.strip()}")
     return ", ".join([p for p in parts if p])
 
+
 def extract_image_bytes(data: dict) -> bytes:
     if isinstance(data, dict):
+
+        # NVIDIA / Stability format
         if isinstance(data.get("artifacts"), list) and data["artifacts"]:
             first = data["artifacts"][0]
 
             if isinstance(first, dict):
+
+                # 🚨 Handle blocked content
                 if first.get("finishReason") == "CONTENT_FILTERED":
                     raise RuntimeError(
-                        "This prompt was blocked by the safety filter. Try a more generic prompt."
+                        "This prompt was blocked by the safety filter. Try a more generic prompt (no real people)."
                     )
 
                 if first.get("base64"):
                     return base64.b64decode(first["base64"])
 
+        # OpenAI-like format
         if isinstance(data.get("data"), list) and data["data"]:
             first = data["data"][0]
             if isinstance(first, dict) and first.get("b64_json"):
@@ -360,6 +400,7 @@ def extract_image_bytes(data: dict) -> bytes:
             return base64.b64decode(data["b64_json"])
 
     raise RuntimeError(f"Unexpected image response format: {data}")
+
 
 def generate_flux_image(user_prompt: str, style_label: str, avoid_text: str, seed: int) -> bytes:
     if not IMAGE_API_KEY:
@@ -381,7 +422,7 @@ def generate_flux_image(user_prompt: str, style_label: str, avoid_text: str, see
 
     for attempt in range(2):
         response = requests.post(
-            FLUX_GENERATE_ENDPOINT,
+            FLUX_ENDPOINT,
             headers=headers,
             json=payload,
             timeout=180,
@@ -397,6 +438,7 @@ def generate_flux_image(user_prompt: str, style_label: str, avoid_text: str, see
 
         last_error = f"{response.status_code}: {detail}"
 
+        # Retry once for temporary backend errors
         if response.status_code >= 500 and attempt == 0:
             time.sleep(1.1)
             continue
@@ -405,38 +447,10 @@ def generate_flux_image(user_prompt: str, style_label: str, avoid_text: str, see
 
     raise RuntimeError(last_error or "Unknown image generation error.")
 
-def edit_flux_image(image_file, prompt: str) -> bytes:
-    if not IMAGE_API_KEY:
-        raise RuntimeError("Missing STABILITY_API_KEY in Streamlit Secrets.")
 
-    headers = {
-        "Authorization": f"Bearer {IMAGE_API_KEY}",
-        "Accept": "application/json",
-    }
-
-    mime = image_file.type or "image/png"
-    files = {
-        "model": (None, "black-forest-labs/flux.2-klein-4b"),
-        "prompt": (None, prompt),
-        "image": (image_file.name, image_file.getvalue(), mime),
-    }
-
-    response = requests.post(
-        FLUX_EDIT_ENDPOINT,
-        headers=headers,
-        files=files,
-        timeout=180,
-    )
-
-    if response.status_code != 200:
-        try:
-            detail = response.json()
-        except Exception:
-            detail = response.text
-        raise RuntimeError(f"{response.status_code}: {detail}")
-
-    return extract_image_bytes(response.json())
-
+# =========================================
+# STATE
+# =========================================
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
@@ -446,9 +460,9 @@ if "last_image_bytes" not in st.session_state:
 if "last_image_prompt" not in st.session_state:
     st.session_state.last_image_prompt = ""
 
-if "last_edited_image" not in st.session_state:
-    st.session_state.last_edited_image = None
-
+# =========================================
+# SIDEBAR
+# =========================================
 with st.sidebar:
     st.markdown("### Control panel")
     image_style = st.selectbox("Image style", list(STYLE_PRESETS.keys()), index=1)
@@ -462,10 +476,14 @@ with st.sidebar:
     st.caption("Chat key loaded" if CHAT_API_KEY else "Missing NVIDIA_API_KEY")
     st.caption("Image key loaded" if IMAGE_API_KEY else "Missing STABILITY_API_KEY")
 
-chat_tab, doc_tab, image_tab, edit_tab = st.tabs(
-    ["💬 Chat", "📄 Document Q&A", "🎨 Generate Image", "🪄 Edit Image"]
-)
+# =========================================
+# TABS
+# =========================================
+chat_tab, doc_tab, image_tab = st.tabs(["💬 Chat", "📄 Document Q&A", "🎨 Generate Image"])
 
+# =========================================
+# CHAT TAB
+# =========================================
 with chat_tab:
     if not CHAT_API_KEY:
         st.info("Add NVIDIA_API_KEY in Streamlit Secrets to use chat.")
@@ -499,6 +517,9 @@ with chat_tab:
 
             st.session_state.chat_history.append({"role": "assistant", "content": reply})
 
+# =========================================
+# DOCUMENT TAB
+# =========================================
 with doc_tab:
     if not CHAT_API_KEY:
         st.info("Add NVIDIA_API_KEY in Streamlit Secrets to use document Q&A.")
@@ -557,11 +578,14 @@ with doc_tab:
             else:
                 st.warning("No readable text was extracted from this file.")
 
+# =========================================
+# IMAGE TAB
+# =========================================
 with image_tab:
     if not IMAGE_API_KEY:
         st.info("Add STABILITY_API_KEY in Streamlit Secrets to use image generation.")
     else:
-        left, right = st.columns([1, 1], gap="large")
+        left, right = st.columns([1.05, 1], gap="large")
 
         with left:
             prompt = st.text_area(
@@ -574,8 +598,6 @@ with image_tab:
                 "Things to avoid (optional)",
                 placeholder="blurry, low quality, bad hands, watermark",
             )
-
-            st.caption("Avoid prompts with real celebrities or public figures.")
 
             if st.button("Generate image", use_container_width=True):
                 if not prompt.strip():
@@ -627,76 +649,4 @@ with image_tab:
                     </div>
                     """,
                     unsafe_allow_html=True,
-                )
-
-with edit_tab:
-    if not IMAGE_API_KEY:
-        st.info("Add STABILITY_API_KEY in Streamlit Secrets to use image editing.")
-    else:
-        left, right = st.columns([1, 1], gap="large")
-
-        with left:
-            uploaded_edit_image = st.file_uploader(
-                "Upload an image to edit",
-                type=["png", "jpg", "jpeg", "webp"],
-                key="edit_image_uploader",
             )
-
-            edit_prompt = st.text_area(
-                "Describe the change you want",
-                placeholder="Make the sky golden sunset and add cinematic lighting",
-                height=120,
-            )
-
-            st.caption("Avoid prompts asking to create or edit real celebrities.")
-
-            if uploaded_edit_image is not None:
-                st.image(uploaded_edit_image, caption="Original image", use_container_width=True)
-
-            if st.button("Edit image", use_container_width=True):
-                if uploaded_edit_image is None:
-                    st.warning("Upload an image first.")
-                elif not edit_prompt.strip():
-                    st.warning("Describe the edit first.")
-                else:
-                    with right:
-                        preview_box = st.empty()
-                        preview_box.markdown('<div class="shimmer"></div>', unsafe_allow_html=True)
-
-                    try:
-                        edited_bytes = edit_flux_image(uploaded_edit_image, edit_prompt)
-                        st.session_state.last_edited_image = edited_bytes
-                    except Exception as e:
-                        st.session_state.last_edited_image = None
-                        with right:
-                            preview_box.empty()
-                        st.error(f"Image editing failed: {e}")
-
-        with right:
-            if st.session_state.last_edited_image:
-                st.image(
-                    st.session_state.last_edited_image,
-                    caption="Edited image",
-                    use_container_width=True,
-                )
-                st.download_button(
-                    "Download edited image",
-                    data=st.session_state.last_edited_image,
-                    file_name="elmahdi-helper-edited.png",
-                    mime="image/png",
-                    use_container_width=True,
-                )
-            else:
-                st.markdown(
-                    """
-                    <div class="card preview-shell">
-                        <div>
-                            <h3 style="margin:0 0 0.5rem 0; color:#eef6ff;">Edited Preview</h3>
-                            <p style="margin:0; color:#bfd0ea;">
-                                Your edited image will appear here.
-                            </p>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-        )
