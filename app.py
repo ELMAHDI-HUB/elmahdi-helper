@@ -1,60 +1,21 @@
 import base64
 import io
-import os
 import re
-import tempfile
 import time
 from textwrap import dedent
 
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 from openai import OpenAI
 from PyPDF2 import PdfReader
 from docx import Document
-
-# =========================================
-# BRAND LOGO
-# =========================================
-BRAND_SVG = dedent(
-    """
-<svg width="112" height="112" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="brandGrad" x1="10" y1="8" x2="102" y2="104" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5B5CFF"/>
-      <stop offset="0.55" stop-color="#12B8FF"/>
-      <stop offset="1" stop-color="#2DE2D0"/>
-    </linearGradient>
-    <filter id="brandShadow" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#09162C" flood-opacity="0.45"/>
-    </filter>
-  </defs>
-
-  <rect x="8" y="8" width="96" height="96" rx="28" fill="url(#brandGrad)" filter="url(#brandShadow)"/>
-  <path d="M35 35H74" stroke="white" stroke-width="10" stroke-linecap="round"/>
-  <path d="M35 56H67" stroke="white" stroke-width="10" stroke-linecap="round"/>
-  <path d="M35 77H74" stroke="white" stroke-width="10" stroke-linecap="round"/>
-  <path d="M35 35V77" stroke="white" stroke-width="10" stroke-linecap="round"/>
-  <circle cx="82" cy="29" r="6" fill="#E8FBFF"/>
-</svg>
-"""
-).strip()
-
-
-def ensure_logo_file() -> str:
-    path = os.path.join(tempfile.gettempdir(), "elmahdi_helper_logo.svg")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(BRAND_SVG)
-    return path
-
-
-LOGO_FILE = ensure_logo_file()
 
 # =========================================
 # CONFIG
 # =========================================
 CHAT_MODEL = "openai/gpt-oss-120b"
 FLUX_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b"
+JSON2VIDEO_MOVIES_URL = "https://api.json2video.com/v2/movies"
 
 st.set_page_config(
     page_title="ELMAHDI HELPER",
@@ -63,379 +24,103 @@ st.set_page_config(
 )
 
 # =========================================
-# GLOBAL STYLING
+# SAFE STYLING
 # =========================================
 st.markdown(
     dedent(
         """
-<style>
-    :root {
-        --bg1: #050814;
-        --bg2: #0c1320;
-        --panel: rgba(255,255,255,0.05);
-        --panel2: rgba(255,255,255,0.035);
-        --border: rgba(255,255,255,0.08);
-        --text: #eef5ff;
-        --muted: #bfd0ea;
-        --muted2: #91a8cb;
-        --shadow: 0 20px 60px rgba(0,0,0,0.28);
-    }
+        <style>
+            .stApp {
+                background:
+                    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 30%),
+                    radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 28%),
+                    linear-gradient(180deg, #060b16 0%, #0c1320 100%);
+                color: #eaf2ff;
+            }
 
-    .stApp {
-        background:
-            radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.18), transparent 24%),
-            radial-gradient(circle at 88% 8%, rgba(168, 85, 247, 0.14), transparent 22%),
-            radial-gradient(circle at 50% 100%, rgba(34, 211, 238, 0.10), transparent 30%),
-            linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
-        color: var(--text);
-    }
+            [data-testid="stHeader"] {
+                background: transparent;
+            }
 
-    [data-testid="stHeader"] {
-        background: transparent;
-    }
+            [data-testid="stSidebar"] {
+                background: rgba(10, 15, 25, 0.92);
+                border-right: 1px solid rgba(255,255,255,0.07);
+            }
 
-    [data-testid="stSidebar"] {
-        background: rgba(7, 12, 22, 0.92);
-        border-right: 1px solid var(--border);
-    }
+            .block-container {
+                max-width: 1200px;
+                padding-top: 1.1rem;
+                padding-bottom: 2rem;
+            }
 
-    .block-container {
-        max-width: 1220px;
-        padding-top: 1.1rem;
-        padding-bottom: 2rem;
-    }
+            div[data-baseweb="tab-list"] {
+                gap: 0.45rem;
+                margin-bottom: 0.85rem;
+            }
 
-    h1, h2, h3 {
-        color: #f7fbff;
-        letter-spacing: -0.02em;
-    }
+            button[data-baseweb="tab"] {
+                border-radius: 14px !important;
+                background: rgba(255,255,255,0.03) !important;
+                border: 1px solid rgba(255,255,255,0.07) !important;
+                color: #dce9ff !important;
+            }
 
-    .stCaption {
-        color: var(--muted2) !important;
-    }
+            button[data-baseweb="tab"][aria-selected="true"] {
+                background: linear-gradient(135deg, rgba(79,70,229,0.35), rgba(6,182,212,0.25)) !important;
+                color: white !important;
+                border-color: rgba(255,255,255,0.12) !important;
+            }
 
-    div[data-baseweb="tab-list"] {
-        gap: 0.5rem;
-        margin-bottom: 0.9rem;
-    }
+            .stButton button, .stDownloadButton button {
+                border-radius: 16px !important;
+                border: 1px solid rgba(255,255,255,0.08) !important;
+                background: linear-gradient(135deg, #4f46e5, #06b6d4) !important;
+                color: white !important;
+                font-weight: 700 !important;
+            }
 
-    button[data-baseweb="tab"] {
-        border-radius: 14px !important;
-        padding: 0.56rem 1rem !important;
-        background: rgba(255,255,255,0.03) !important;
-        border: 1px solid rgba(255,255,255,0.06) !important;
-        color: #dbe8ff !important;
-    }
+            .stTextInput input,
+            .stTextArea textarea,
+            .stNumberInput input {
+                background: rgba(8, 14, 24, 0.82) !important;
+                color: #eef5ff !important;
+                border-radius: 14px !important;
+                border: 1px solid rgba(255,255,255,0.08) !important;
+            }
 
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(135deg, rgba(79,70,229,0.34), rgba(6,182,212,0.24)) !important;
-        border-color: rgba(125, 211, 252, 0.22) !important;
-        color: white !important;
-        box-shadow: 0 12px 24px rgba(79,70,229,0.18);
-    }
+            div[data-baseweb="select"] > div {
+                background: rgba(8, 14, 24, 0.82) !important;
+                border: 1px solid rgba(255,255,255,0.08) !important;
+                color: #eef5ff !important;
+            }
 
-    .stButton button,
-    .stDownloadButton button {
-        border-radius: 16px !important;
-        border: 1px solid rgba(255,255,255,0.08) !important;
-        background: linear-gradient(135deg, #4f46e5, #06b6d4) !important;
-        color: white !important;
-        font-weight: 700 !important;
-        padding-top: 0.58rem !important;
-        padding-bottom: 0.58rem !important;
-        box-shadow: 0 14px 28px rgba(79,70,229,0.22);
-        transition: transform 0.16s ease, box-shadow 0.16s ease;
-    }
+            section[data-testid="stFileUploadDropzone"] {
+                background: rgba(8, 14, 24, 0.68) !important;
+                border: 1px dashed rgba(125, 211, 252, 0.28) !important;
+                border-radius: 18px !important;
+            }
 
-    .stButton button:hover,
-    .stDownloadButton button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 18px 34px rgba(79,70,229,0.28);
-    }
+            [data-testid="stChatMessage"] {
+                background: rgba(255,255,255,0.035);
+                border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 18px;
+                padding: 0.45rem 0.75rem;
+            }
 
-    .stTextInput input,
-    .stTextArea textarea,
-    .stNumberInput input {
-        background: rgba(8, 14, 24, 0.82) !important;
-        color: #eef5ff !important;
-        border-radius: 14px !important;
-        border: 1px solid rgba(255,255,255,0.08) !important;
-    }
-
-    .stTextInput > div > div,
-    .stTextArea > div > div,
-    .stSelectbox > div > div,
-    .stNumberInput > div > div,
-    .stFileUploader > div {
-        border-radius: 14px !important;
-    }
-
-    div[data-baseweb="select"] > div {
-        background: rgba(8, 14, 24, 0.82) !important;
-        border: 1px solid rgba(255,255,255,0.08) !important;
-        color: #eef5ff !important;
-    }
-
-    section[data-testid="stFileUploadDropzone"] {
-        background: rgba(8, 14, 24, 0.68) !important;
-        border: 1px dashed rgba(125, 211, 252, 0.28) !important;
-        border-radius: 18px !important;
-    }
-
-    [data-testid="stChatMessage"] {
-        background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025));
-        border: 1px solid rgba(255,255,255,0.065);
-        border-radius: 20px;
-        padding: 0.55rem 0.8rem;
-        box-shadow: 0 10px 28px rgba(0,0,0,0.12);
-    }
-
-    div[data-testid="stAlert"] {
-        border-radius: 18px;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.04);
-    }
-
-    pre, code {
-        border-radius: 14px !important;
-    }
-
-    hr {
-        border-color: rgba(255,255,255,0.08) !important;
-    }
-
-    footer { visibility: hidden; }
-    #MainMenu { visibility: hidden; }
-</style>
-"""
+            footer { visibility: hidden; }
+            #MainMenu { visibility: hidden; }
+        </style>
+        """
     ),
     unsafe_allow_html=True,
 )
 
 # =========================================
-# HERO BANNER
-# =========================================
-def render_hero_banner():
-    hero_html = dedent(
-        """
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>
-    html, body {
-        margin: 0;
-        padding: 0;
-        background: transparent;
-        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #eef5ff;
-    }
-
-    * { box-sizing: border-box; }
-
-    .hero {
-        position: relative;
-        overflow: hidden;
-        display: grid;
-        grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.95fr);
-        gap: 16px;
-        padding: 22px;
-        border-radius: 30px;
-        border: 1px solid rgba(255,255,255,0.10);
-        background:
-            radial-gradient(circle at top right, rgba(116, 89, 255, 0.22), transparent 32%),
-            linear-gradient(135deg, rgba(40, 86, 200, 0.44), rgba(8, 102, 139, 0.24));
-        box-shadow: 0 22px 60px rgba(0,0,0,0.28);
-    }
-
-    .hero::after {
-        content: "";
-        position: absolute;
-        right: -50px;
-        bottom: -60px;
-        width: 220px;
-        height: 220px;
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(45, 226, 208, 0.12), transparent 65%);
-        pointer-events: none;
-    }
-
-    .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.16em;
-        color: #c7ddff;
-        margin-bottom: 12px;
-    }
-
-    .eyebrow::before {
-        content: "";
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: linear-gradient(135deg, #60a5fa, #22d3ee);
-        box-shadow: 0 0 12px rgba(34, 211, 238, 0.55);
-    }
-
-    .brand-row {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-
-    .logo-wrap {
-        width: 88px;
-        height: 88px;
-        flex: 0 0 auto;
-    }
-
-    .title {
-        margin: 0;
-        font-size: clamp(30px, 4.2vw, 44px);
-        line-height: 1.02;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        color: #ffffff;
-    }
-
-    .subtitle {
-        margin-top: 10px;
-        font-size: 16px;
-        line-height: 1.65;
-        color: #cad9f2;
-        max-width: 680px;
-    }
-
-    .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 16px;
-    }
-
-    .pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 9px 13px;
-        border-radius: 999px;
-        background: rgba(255,255,255,0.075);
-        border: 1px solid rgba(255,255,255,0.09);
-        color: #f0f7ff;
-        font-size: 13px;
-    }
-
-    .side {
-        display: grid;
-        gap: 12px;
-    }
-
-    .mini-card {
-        background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
-        border: 1px solid rgba(255,255,255,0.09);
-        border-radius: 20px;
-        padding: 16px;
-        box-shadow: 0 12px 28px rgba(0,0,0,0.16);
-    }
-
-    .mini-label {
-        color: #bbd6ff;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        margin-bottom: 8px;
-    }
-
-    .mini-value {
-        color: white;
-        font-weight: 700;
-        font-size: 18px;
-        margin-bottom: 6px;
-    }
-
-    .mini-text {
-        color: #c9daf4;
-        font-size: 14px;
-        line-height: 1.55;
-    }
-
-    @media (max-width: 860px) {
-        .hero {
-            grid-template-columns: 1fr;
-            padding: 18px;
-        }
-
-        .brand-row {
-            align-items: flex-start;
-        }
-
-        .logo-wrap {
-            width: 72px;
-            height: 72px;
-        }
-    }
-</style>
-</head>
-<body>
-    <div class="hero">
-        <div>
-            <div class="eyebrow">ELMAHDI AI • PREMIUM WORKSPACE</div>
-            <div class="brand-row">
-                <div class="logo-wrap">__SVG__</div>
-                <div>
-                    <h1 class="title">ELMAHDI HELPER</h1>
-                    <div class="subtitle">
-                        Smart chat, document Q&amp;A, and image generation in one clean app.
-                    </div>
-                </div>
-            </div>
-
-            <div class="pill-row">
-                <span class="pill">Creator: Elmahdi Oukassou</span>
-                <span class="pill">Fast replies</span>
-                <span class="pill">Document upload</span>
-                <span class="pill">Image generator</span>
-            </div>
-        </div>
-
-        <div class="side">
-            <div class="mini-card">
-                <div class="mini-label">Brand style</div>
-                <div class="mini-value">Modern glass + neon accent</div>
-                <div class="mini-text">
-                    Clean contrast, strong logo treatment, and a more premium visual identity.
-                </div>
-            </div>
-
-            <div class="mini-card">
-                <div class="mini-label">Built for</div>
-                <div class="mini-value">Chat, docs, and images</div>
-                <div class="mini-text">
-                    Better tabs, better spacing, cleaner inputs, and a more polished overall feel.
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-"""
-    ).replace("__SVG__", BRAND_SVG)
-
-    components.html(hero_html, height=320, scrolling=False)
-
-
-render_hero_banner()
-
-# =========================================
 # SECRETS
-# Keep these exact names in Streamlit Secrets:
-# NVIDIA_API_KEY   = your chat key
-# STABILITY_API_KEY = your second NVIDIA key from the FLUX page
 # =========================================
 CHAT_API_KEY = st.secrets["NVIDIA_API_KEY"] if "NVIDIA_API_KEY" in st.secrets else None
 IMAGE_API_KEY = st.secrets["STABILITY_API_KEY"] if "STABILITY_API_KEY" in st.secrets else None
+VIDEO_API_KEY = st.secrets["JSON2VIDEO_API_KEY"] if "JSON2VIDEO_API_KEY" in st.secrets else None
 
 chat_client = None
 if CHAT_API_KEY:
@@ -466,6 +151,18 @@ STYLE_PRESETS = {
     "Realistic": "photorealistic, natural lighting, realistic textures, sharp focus",
     "Anime": "anime style, vibrant colors, expressive faces, cel shading",
     "Fantasy": "fantasy art, magical atmosphere, epic composition, highly detailed illustration",
+}
+
+VIDEO_IMAGE_MODELS = {
+    "Flux Schnell (fast)": "flux-schnell",
+    "Flux Pro (quality)": "flux-pro",
+    "Freepik Classic (illustration)": "freepik-classic",
+}
+
+VIDEO_FORMATS = {
+    "Portrait 1080x1920": {"width": 1080, "height": 1920, "aspect_ratio": "vertical"},
+    "Landscape 1920x1080": {"width": 1920, "height": 1080, "aspect_ratio": "horizontal"},
+    "Square 1080x1080": {"width": 1080, "height": 1080, "aspect_ratio": "squared"},
 }
 
 # =========================================
@@ -556,13 +253,11 @@ def extract_image_bytes(data: dict) -> bytes:
     if isinstance(data, dict):
         if isinstance(data.get("artifacts"), list) and data["artifacts"]:
             first = data["artifacts"][0]
-
             if isinstance(first, dict):
                 if first.get("finishReason") == "CONTENT_FILTERED":
                     raise RuntimeError(
                         "This prompt was blocked by the safety filter. Try a more generic prompt (no real people)."
                     )
-
                 if first.get("base64"):
                     return base64.b64decode(first["base64"])
 
@@ -624,6 +319,183 @@ def generate_flux_image(user_prompt: str, style_label: str, avoid_text: str, see
 
     raise RuntimeError(last_error or "Unknown image generation error.")
 
+
+def parse_response_json(response: requests.Response) -> dict:
+    try:
+        return response.json()
+    except Exception:
+        return {"raw": response.text}
+
+
+def json2video_headers() -> dict:
+    if not VIDEO_API_KEY:
+        raise RuntimeError("Missing JSON2VIDEO_API_KEY in Streamlit Secrets.")
+    return {
+        "x-api-key": VIDEO_API_KEY,
+        "Content-Type": "application/json",
+    }
+
+
+def build_video_movie(
+    image_prompt: str,
+    headline: str,
+    subtitle: str,
+    duration_seconds: int,
+    image_model: str,
+    format_label: str,
+) -> dict:
+    fmt = VIDEO_FORMATS[format_label]
+    width = fmt["width"]
+    height = fmt["height"]
+    aspect_ratio = fmt["aspect_ratio"]
+
+    title_size = "84px" if aspect_ratio == "vertical" else "62px"
+    subtitle_size = "34px" if aspect_ratio == "vertical" else "28px"
+    pan_direction = "top" if aspect_ratio == "vertical" else "right"
+
+    elements = [
+        {
+            "type": "image",
+            "model": image_model,
+            "prompt": image_prompt.strip(),
+            "aspect-ratio": aspect_ratio,
+            "resize": "fill",
+            "duration": duration_seconds,
+            "zoom": 3,
+            "pan": pan_direction,
+        }
+    ]
+
+    final_headline = (headline or image_prompt).strip()[:120]
+    final_subtitle = subtitle.strip()[:220]
+
+    if final_headline:
+        elements.append(
+            {
+                "type": "text",
+                "text": final_headline,
+                "settings": {
+                    "font-family": "Poppins",
+                    "font-size": title_size,
+                    "font-weight": "800",
+                    "font-color": "#FFFFFF",
+                    "text-align": "center",
+                    "vertical-position": "center",
+                    "horizontal-position": "center",
+                    "line-height": "1.08",
+                    "padding": "18px 26px",
+                    "background-color": "rgba(4, 11, 24, 0.42)",
+                    "border-radius": "18px",
+                    "text-shadow": "0 10px 30px rgba(0,0,0,0.35)",
+                },
+            }
+        )
+
+    if final_subtitle:
+        elements.append(
+            {
+                "type": "text",
+                "text": final_subtitle,
+                "settings": {
+                    "font-family": "Inter",
+                    "font-size": subtitle_size,
+                    "font-weight": "600",
+                    "font-color": "#F6FAFF",
+                    "text-align": "center",
+                    "vertical-position": "bottom",
+                    "horizontal-position": "center",
+                    "line-height": "1.35",
+                    "padding": "14px 20px",
+                    "background-color": "rgba(4, 11, 24, 0.55)",
+                    "border-radius": "16px",
+                },
+            }
+        )
+
+    return {
+        "resolution": "custom",
+        "width": width,
+        "height": height,
+        "quality": "high",
+        "scenes": [
+            {
+                "duration": duration_seconds,
+                "elements": elements,
+            }
+        ],
+    }
+
+
+def json2video_create_movie(movie_payload: dict) -> dict:
+    response = requests.post(
+        JSON2VIDEO_MOVIES_URL,
+        headers=json2video_headers(),
+        json=movie_payload,
+        timeout=120,
+    )
+    data = parse_response_json(response)
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"JSON2Video error {response.status_code}: {data}")
+
+    if not data.get("success"):
+        raise RuntimeError(data.get("message") or str(data))
+
+    return data
+
+
+def json2video_get_movie(project_id: str) -> dict:
+    response = requests.get(
+        JSON2VIDEO_MOVIES_URL,
+        headers={"x-api-key": VIDEO_API_KEY},
+        params={"project": project_id},
+        timeout=60,
+    )
+    data = parse_response_json(response)
+
+    if response.status_code >= 400:
+        raise RuntimeError(f"JSON2Video error {response.status_code}: {data}")
+
+    if not data.get("success"):
+        raise RuntimeError(data.get("message") or str(data))
+
+    return data.get("movie", {})
+
+
+def store_video_state(movie: dict):
+    st.session_state.video_status = movie.get("status", "pending")
+    st.session_state.video_message = movie.get("message", "")
+    st.session_state.video_url = movie.get("url", "") if movie.get("status") == "done" else ""
+    st.session_state.video_result = movie
+
+
+def reset_video_state():
+    st.session_state.video_project_id = ""
+    st.session_state.video_status = ""
+    st.session_state.video_message = ""
+    st.session_state.video_url = ""
+    st.session_state.video_result = {}
+
+
+def poll_video_until_ready(project_id: str, max_checks: int = 12, delay_seconds: int = 5):
+    status_box = st.empty()
+    progress_box = st.progress(0.0)
+    last_movie = {}
+
+    for i in range(max_checks):
+        last_movie = json2video_get_movie(project_id)
+        status = (last_movie.get("status") or "pending").lower()
+        status_box.info(f"Render status: {status} ({i + 1}/{max_checks})")
+        progress_box.progress((i + 1) / max_checks)
+
+        if status in {"done", "error"}:
+            break
+
+        time.sleep(delay_seconds)
+
+    progress_box.empty()
+    return last_movie
+
 # =========================================
 # STATE
 # =========================================
@@ -636,27 +508,41 @@ if "last_image_bytes" not in st.session_state:
 if "last_image_prompt" not in st.session_state:
     st.session_state.last_image_prompt = ""
 
+if "video_project_id" not in st.session_state:
+    st.session_state.video_project_id = ""
+
+if "video_status" not in st.session_state:
+    st.session_state.video_status = ""
+
+if "video_message" not in st.session_state:
+    st.session_state.video_message = ""
+
+if "video_url" not in st.session_state:
+    st.session_state.video_url = ""
+
+if "video_result" not in st.session_state:
+    st.session_state.video_result = {}
+
 # =========================================
-# FEATURE ROW
+# HEADER
 # =========================================
-f1, f2, f3 = st.columns(3, gap="large")
-with f1:
-    st.info("💬 **Chat assistant**\n\nCleaner conversation flow with better spacing and contrast.")
-with f2:
-    st.info("📄 **Document workspace**\n\nUpload files, preview extracted text, and ask focused questions.")
-with f3:
-    st.info("🎨 **Image studio**\n\nGenerate visuals in a cleaner, more branded workspace.")
+st.title("ELMAHDI HELPER")
+st.caption("Smart chat, document Q&A, image generation, and short AI video creation in one clean app.")
+
+card1, card2, card3, card4 = st.columns(4)
+with card1:
+    st.info("**Creator**\n\nElmahdi Oukassou")
+with card2:
+    st.info("**Chat**\n\nFast replies")
+with card3:
+    st.info("**Docs**\n\nUpload and analyze")
+with card4:
+    st.info("**Media**\n\nImages and short videos")
 
 # =========================================
 # SIDEBAR
 # =========================================
 with st.sidebar:
-    st.image(LOGO_FILE, width=76)
-    st.markdown("## ELMAHDI HELPER")
-    st.caption("Premium AI workspace for chat, documents, and images.")
-
-    st.divider()
-
     st.markdown("### Control panel")
     image_style = st.selectbox("Image style", list(STYLE_PRESETS.keys()), index=1)
     image_seed = st.number_input("Image seed (0 = random)", min_value=0, value=0, step=1)
@@ -665,31 +551,23 @@ with st.sidebar:
         st.session_state.chat_history = []
         safe_rerun()
 
-    st.divider()
+    st.markdown("---")
     st.markdown("### Status")
-
-    if CHAT_API_KEY:
-        st.success("Chat key loaded")
-    else:
-        st.warning("Missing NVIDIA_API_KEY")
-
-    if IMAGE_API_KEY:
-        st.success("Image key loaded")
-    else:
-        st.warning("Missing STABILITY_API_KEY")
+    st.caption("Chat key loaded" if CHAT_API_KEY else "Missing NVIDIA_API_KEY")
+    st.caption("Image key loaded" if IMAGE_API_KEY else "Missing STABILITY_API_KEY")
+    st.caption("Video key loaded" if VIDEO_API_KEY else "Missing JSON2VIDEO_API_KEY")
 
 # =========================================
 # TABS
 # =========================================
-chat_tab, doc_tab, image_tab = st.tabs(["💬 Chat", "📄 Document Q&A", "🎨 Generate Image"])
+chat_tab, doc_tab, image_tab, video_tab = st.tabs(
+    ["💬 Chat", "📄 Document Q&A", "🎨 Generate Image", "🎬 Generate Video"]
+)
 
 # =========================================
 # CHAT TAB
 # =========================================
 with chat_tab:
-    st.subheader("Chat assistant")
-    st.caption("Ask questions, brainstorm ideas, or get quick help.")
-
     if not CHAT_API_KEY:
         st.info("Add NVIDIA_API_KEY in Streamlit Secrets to use chat.")
     else:
@@ -723,9 +601,6 @@ with chat_tab:
 # DOCUMENT TAB
 # =========================================
 with doc_tab:
-    st.subheader("Document Q&A")
-    st.caption("Upload TXT, CSV, PDF, or DOCX and ask questions about the content.")
-
     if not CHAT_API_KEY:
         st.info("Add NVIDIA_API_KEY in Streamlit Secrets to use document Q&A.")
     else:
@@ -784,9 +659,6 @@ with doc_tab:
 # IMAGE TAB
 # =========================================
 with image_tab:
-    st.subheader("Image studio")
-    st.caption("Describe what you want, choose a style, and generate an image.")
-
     if not IMAGE_API_KEY:
         st.info("Add STABILITY_API_KEY in Streamlit Secrets to use image generation.")
     else:
@@ -837,9 +709,114 @@ with image_tab:
                     use_container_width=True,
                 )
             else:
-                p1, p2 = st.columns([1, 4])
-                with p1:
-                    st.image(LOGO_FILE, width=64)
-                with p2:
-                    st.markdown("#### Image preview")
-                    st.caption("Your generated image will appear here.")
+                st.info("Your generated image will appear here.")
+
+# =========================================
+# VIDEO TAB
+# =========================================
+with video_tab:
+    st.subheader("Short AI video generator")
+    st.caption("This tab creates a short video using an AI-generated image background plus text overlay.")
+
+    if not VIDEO_API_KEY:
+        st.info("Add JSON2VIDEO_API_KEY in Streamlit Secrets to use video generation.")
+    else:
+        left, right = st.columns([1.08, 1], gap="large")
+
+        with left:
+            video_prompt = st.text_area(
+                "Describe the video background",
+                placeholder="A futuristic Moroccan city at sunset, neon lights, cinematic, ultra detailed",
+                height=140,
+            )
+
+            video_headline = st.text_input(
+                "Headline text",
+                placeholder="Morocco in 2040",
+            )
+
+            video_subtitle = st.text_area(
+                "Subtitle / caption (optional)",
+                placeholder="Technology, culture, and design in one bold vision.",
+                height=90,
+            )
+
+            video_format_label = st.selectbox(
+                "Video format",
+                list(VIDEO_FORMATS.keys()),
+                index=0,
+            )
+
+            video_model_label = st.selectbox(
+                "Background AI model",
+                list(VIDEO_IMAGE_MODELS.keys()),
+                index=0,
+            )
+
+            video_duration = st.slider(
+                "Video length (seconds)",
+                min_value=4,
+                max_value=12,
+                value=6,
+            )
+
+            if st.button("Generate video", use_container_width=True):
+                if not video_prompt.strip():
+                    st.warning("Write a video prompt first.")
+                else:
+                    try:
+                        movie_payload = build_video_movie(
+                            image_prompt=video_prompt,
+                            headline=video_headline,
+                            subtitle=video_subtitle,
+                            duration_seconds=video_duration,
+                            image_model=VIDEO_IMAGE_MODELS[video_model_label],
+                            format_label=video_format_label,
+                        )
+
+                        with st.spinner("Submitting video render..."):
+                            created = json2video_create_movie(movie_payload)
+
+                        project_id = created.get("project", "")
+                        st.session_state.video_project_id = project_id
+                        st.session_state.video_status = "submitted"
+                        st.session_state.video_message = ""
+                        st.session_state.video_url = ""
+                        st.session_state.video_result = {}
+
+                        movie = poll_video_until_ready(project_id, max_checks=12, delay_seconds=5)
+                        store_video_state(movie)
+
+                    except Exception as e:
+                        st.error(f"Video generation failed: {e}")
+
+        with right:
+            st.markdown("#### Video preview")
+            if st.session_state.video_project_id:
+                st.caption(f"Project ID: {st.session_state.video_project_id}")
+
+                btn1, btn2 = st.columns(2)
+                with btn1:
+                    if st.button("Refresh video status", use_container_width=True):
+                        try:
+                            movie = json2video_get_movie(st.session_state.video_project_id)
+                            store_video_state(movie)
+                        except Exception as e:
+                            st.error(f"Could not refresh status: {e}")
+
+                with btn2:
+                    if st.button("Reset video", use_container_width=True):
+                        reset_video_state()
+                        safe_rerun()
+
+            current_status = st.session_state.video_status or "idle"
+            st.write(f"Status: **{current_status}**")
+
+            if st.session_state.video_message:
+                st.caption(st.session_state.video_message)
+
+            if st.session_state.video_url:
+                st.video(st.session_state.video_url)
+                st.markdown(f"[Open rendered video]({st.session_state.video_url})")
+            else:
+                st.info("Your rendered video will appear here after the job finishes.")
